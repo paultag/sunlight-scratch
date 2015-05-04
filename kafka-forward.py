@@ -17,10 +17,16 @@ DATA_ROOT = os.path.abspath("./data")
 
 def iternodes(message):
     report = message['report']
-    for action, treport in report.items():
+    for phase, treport in report.items():
         for action, els in treport.items():
+            if action == 'noop':
+                continue
+
+            if action in ['insert', 'update']:
+                action_ = 'update'
+
             for el in els:
-                yield (action, el)
+                yield (action_, el)
 
 
 class OCDForwarder(object):
