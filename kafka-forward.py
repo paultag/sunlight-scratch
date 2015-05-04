@@ -46,7 +46,8 @@ class OCDForwarder(object):
         self.producer = SimpleProducer(client)
         self.consumer = SimpleConsumer(
             client,
-            str(uuid.uuid4()).encode(),
+            # str(uuid.uuid4()).encode(),
+            b"post-scrape-reports-handlers",
             b"post-scrape-reports",
             max_buffer_size=None,
         )
