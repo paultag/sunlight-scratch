@@ -26,18 +26,19 @@ class OCDForwarder(object):
 
     def run(self):
         client = KafkaClient("localhost:9092")
-        self.producer = SimpleProducer(client)
         self.consumer = SimpleConsumer(
             client,
-            "post-scrape-forwardersss",
-            "post-scrape-reports",
+            b"post-scrape-forwss",
+            b"post-scrape-reports",
             max_buffer_size=None,
         )
 
         for message in self.consumer:
-            message = json.loads(message.message.value)
+            message = json.loads(message.message.value.decode('utf-8'))
+            self.producer = SimpleProducer(client, batch_send=True)
             for action, id_ in iternodes(message):
                 self.send_data(action, id_)
+            self.producer.stop()
 
     def send_data(self, action, id_):
         url = "http://10.42.2.102/{}".format(id_)
@@ -50,11 +51,11 @@ class OCDForwarder(object):
         data = response.json()  # XXX: Fixme
         if response.status_code != 200:
             raise ValueError("Bailed: {}".format(data.text))
-        print("Working on {}".format(id_))
+
         self.producer.send_messages('incoming-data', json.dumps({
             "action": action,
             "data": data,
-        }))
+        }).encode())
 
 
 if __name__ == "__main__":
