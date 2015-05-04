@@ -16,12 +16,18 @@ DATA_ROOT = os.path.abspath("./data")
 
 
 def iternodes(message):
-    report = message['report']
+    if message['report']['success'] is False:
+        print("Skipping bad run")
+        return
+
+    report = message['report']['import']
     for phase, treport in report.items():
-        for action, els in treport.items():
+        trecords = treport['records']
+        for action, els in trecords.items():
             if action == 'noop':
                 continue
 
+            action_ = action
             if action in ['insert', 'update']:
                 action_ = 'update'
 
