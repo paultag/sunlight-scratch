@@ -67,6 +67,7 @@ class FailureProneConsumer(SimpleConsumer):
             self.count_since_commit += 1
             self._auto_commit()
 
+
 class OCDForwarder(object):
     # post-scrape-reports
     # incoming-data
