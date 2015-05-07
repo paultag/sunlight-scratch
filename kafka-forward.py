@@ -10,8 +10,8 @@ from kafka.producer import SimpleProducer
 from contextlib import contextmanager
 import requests
 
-from opencivicdata.api.client import VagrantOCDAPI
-api = VagrantOCDAPI()
+from opencivicdata.api.client import SunlightOCDAPI
+api = SunlightOCDAPI()
 
 DATA_ROOT = os.path.abspath("./data")
 
@@ -126,6 +126,7 @@ class OCDForwarder(object):
 
         try:
             data = api._get_object(id_)
+            time.sleep(0.1)
         except ValueError:
             if fail > 3:
                 raise
