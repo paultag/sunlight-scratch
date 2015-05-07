@@ -7,6 +7,7 @@ from kafka.client import KafkaClient
 from kafka.consumer import SimpleConsumer
 from kafka.producer import SimpleProducer
 
+from contextlib import contextmanager
 import requests
 
 from opencivicdata.api.client import VagrantOCDAPI
@@ -35,6 +36,37 @@ def iternodes(message):
                 yield (action_, el)
 
 
+class FailureProneConsumer(SimpleConsumer):
+
+    def messages(self, timeout=0.1):
+        while True:
+            print("Polling")
+            pack = self._get_message(
+                block=True,
+                timeout=0.1,
+                get_partition_info=True,
+                update_offset=False,
+            )
+            if pack is None:
+                time.sleep(timeout)
+                continue
+            partition, message = pack
+            yield self.message_lock(partition, message)
+
+    @contextmanager
+    def message_lock(self, partition, message):
+        try:
+            print("Entering critical section")
+            yield (partition, message)
+        except Exception:
+            print("Abnormal result; aborting")
+            raise
+        else:
+            print("Updating record")
+            self.offsets[partition] = message.offset + 1
+            self.count_since_commit += 1
+            self._auto_commit()
+
 class OCDForwarder(object):
     # post-scrape-reports
     # incoming-data
@@ -42,23 +74,24 @@ class OCDForwarder(object):
     def run(self, quick=None):
         self.quick = False if quick is None else True
 
-        client = KafkaClient("localhost:9092")
+        client = KafkaClient("52.7.53.35:9092")
         self.producer = SimpleProducer(client)
-        self.consumer = SimpleConsumer(
+        self.consumer = FailureProneConsumer(
             client,
-            # str(uuid.uuid4()).encode(),
-            b"post-scrape-reports-handlers",
+            str(uuid.uuid4()).encode(),
+            #b"post-scrape-reports-handlers",
             b"post-scrape-reports",
             max_buffer_size=None,
         )
 
-        for message in self.consumer:
-            message = json.loads(message.message.value.decode('utf-8'))
-            for _, id_ in iternodes(message):
-                self.fetch_data(id_)
+        for pack in self.consumer.messages(timeout=10):
+            with pack as (partition, message):
+                message = json.loads(message.message.value.decode('utf-8'))
+                for _, id_ in iternodes(message):
+                    self.fetch_data(id_)
 
-            for action, id_ in iternodes(message):
-                self.send_data(action, id_)
+                for action, id_ in iternodes(message):
+                    self.send_data(action, id_)
 
     def send_data(self, action, id_):
         klass, _ = id_.split("/", 1)
@@ -76,6 +109,7 @@ class OCDForwarder(object):
 
 
     def fetch_data(self, id_, fail=0):
+        print("Fetching ID: {}".format(id_))
         klass, _ = id_.split("/", 1)
         if klass in ['ocd-membership', 'ocd-post']:
             """
