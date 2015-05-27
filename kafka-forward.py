@@ -84,15 +84,16 @@ class OCDForwarder(object):
             b"post-scrape-reports",
             max_buffer_size=None,
         )
-
         for pack in self.consumer.messages(timeout=10):
             with pack as (partition, message):
                 message = json.loads(message.message.value.decode('utf-8'))
                 for _, id_ in iternodes(message):
                     self.fetch_data(id_)
+                    self.consumer.fetch_last_known_offsets()
 
                 for action, id_ in iternodes(message):
                     self.send_data(action, id_)
+                    self.consumer.fetch_last_known_offsets()
 
     def send_data(self, action, id_):
         klass, _ = id_.split("/", 1)
